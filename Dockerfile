@@ -1,7 +1,6 @@
 # Gunakan PHP-FPM (fastcgi di port 9000)
 FROM php:8.2-fpm-alpine
 
-# System deps & PHP extensions
 RUN apk add --no-cache \
     git curl bash tzdata \
     libpng-dev libjpeg-turbo-dev freetype-dev \
@@ -9,21 +8,17 @@ RUN apk add --no-cache \
  && docker-php-ext-configure gd --with-jpeg --with-freetype \
  && docker-php-ext-install -j$(nproc) gd zip mbstring exif intl opcache pdo_pgsql pgsql
 
-# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html
 
-# (Opsional, untuk cache build image)
+# (opsional) cache composer saat build image
 COPY composer.json composer.lock ./
 RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader || true
 
-# Copy source code
 COPY . .
 
-# Pastikan permission cache Laravel
 RUN chown -R www-data:www-data storage bootstrap/cache \
  && chmod -R 775 storage bootstrap/cache
 
-# PHP-FPM listen di 9000 (informasi saja)
 EXPOSE 9000
