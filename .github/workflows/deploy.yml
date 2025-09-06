@@ -1,0 +1,51 @@
+name: Laravel Deployment
+
+on:
+  # push:
+  #   branches:
+  #     - main
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: 'Alasan untuk deployment manual (opsional)'
+        required: false
+
+jobs:
+  deploy:
+    environment: Prod
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH
+        uses: webfactory/ssh-agent@v0.7.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Deploy to VPS
+        run: |
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "
+            cd /var/www/laravelTicketing &&
+            
+            # Tarik kode terbaru
+            git pull origin main &&
+
+            # Hentikan dan hapus kontainer yang berjalan
+            docker-compose down &&
+            
+            # Buat file .env secara dinamis dari GitHub Secrets
+            echo 'APP_ENV=production' > .env
+            echo 'APP_KEY=${{ secrets.APP_KEY }}' >> .env
+            echo 'DB_CONNECTION=${{ secrets.DB_CONNECTION }}' >> .env
+            echo 'DB_HOST=${{ secrets.DB_HOST }}' >> .env
+            echo 'DB_DATABASE=${{ secrets.DB_DATABASE }}' >> .env
+            echo 'DB_USERNAME=${{ secrets.DB_USERNAME }}' >> .env
+            echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> .env
+            # Tambahkan variabel ENV lain yang Anda butuhkan
+            
+            # Rebuild dan jalankan kontainer
+            docker-compose build --no-cache &&
+            docker-compose up -d
+          "

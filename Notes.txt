@@ -1,0 +1,4 @@
+Setup
+
+Create Database : ticketing
+Import ticketing.sql

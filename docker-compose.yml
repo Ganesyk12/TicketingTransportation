@@ -1,0 +1,33 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: laravel_app
+    restart: always
+    volumes:
+      - .:/var/www/html
+    ports:
+      - "8000:8000"
+    networks:
+      - tunnel
+
+  nginx:
+    image: nginx:stable-alpine
+    container_name: laravel_nginx
+    restart: always
+    volumes:
+      - .:/var/www/html
+      - ./nginx/nginx.conf:/etc/nginx/conf.d/default.conf
+    ports:
+      - "80:80"
+    networks:
+      - tunnel
+    depends_on:
+      - app
+      
+networks:
+  tunnel:
+    external: true
