@@ -9,10 +9,11 @@ services:
     restart: always
     volumes:
       - .:/var/www/html
-    ports:
-      - "8000:8000"
     networks:
       - tunnel
+    # php-fpm expose internal
+    expose:
+      - "9000"
 
   nginx:
     image: nginx:stable-alpine
@@ -27,7 +28,7 @@ services:
       - tunnel
     depends_on:
       - app
-      
+
 networks:
   tunnel:
     external: true

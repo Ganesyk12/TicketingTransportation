@@ -1,39 +1,29 @@
-# Gunakan image PHP FPM
+# Gunakan PHP-FPM (fastcgi di port 9000)
 FROM php:8.2-fpm-alpine
 
-# Install dependensi yang dibutuhkan
+# System deps & PHP extensions
 RUN apk add --no-cache \
-    git \
-    curl \
-    libpng-dev \
-    libjpeg-turbo-dev \
-    libzip-dev \
-    oniguruma-dev \
-    postgresql-dev \
-    && docker-php-ext-install \
-    gd \
-    zip \
-    mbstring \
-    exif \
-    opcache \
-    pdo_pgsql \
-    pgsql
-    
-# Install Composer
+    git curl bash tzdata \
+    libpng-dev libjpeg-turbo-dev freetype-dev \
+    libzip-dev oniguruma-dev icu-dev postgresql-dev \
+ && docker-php-ext-configure gd --with-jpeg --with-freetype \
+ && docker-php-ext-install -j$(nproc) gd zip mbstring exif intl opcache pdo_pgsql pgsql
+
+# Composer
 COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-# Set working directory
 WORKDIR /var/www/html
 
-# Copy aplikasi
+# (Opsional, untuk cache build image)
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader || true
+
+# Copy source code
 COPY . .
 
-# Install dependensi PHP
-RUN composer install --no-dev --optimize-autoloader
+# Pastikan permission cache Laravel
+RUN chown -R www-data:www-data storage bootstrap/cache \
+ && chmod -R 775 storage bootstrap/cache
 
-# Atur permissions
-RUN chown -R www-data:www-data /var/www/html/storage \
-    && chown -R www-data:www-data /var/www/html/bootstrap/cache
-
-# Expose port
-EXPOSE 8000
+# PHP-FPM listen di 9000 (informasi saja)
+EXPOSE 9000

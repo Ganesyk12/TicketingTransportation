@@ -1,9 +1,6 @@
 name: Laravel Deployment
 
 on:
-  # push:
-  #   branches:
-  #     - main
   workflow_dispatch:
     inputs:
       reason:
@@ -26,36 +23,65 @@ jobs:
 
       - name: Deploy to VPS
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "
-            PROJECT_DIR=/var/www/TicketingTransportation
-            REPO_URL=https://github.com/Ganesyk12/TicketingTransportation.git
-            
-            if [ ! -d \"$PROJECT_DIR\" ] || [ ! -d \"$PROJECT_DIR/.git\" ]; then
-              echo 'Project directory not found or not a Git repo. Cloning repository...'
-              # Pastikan direktori induk ada
-              mkdir -p \"$PROJECT_DIR\"
-              git clone \"$REPO_URL\" \"$PROJECT_DIR\"
-              cd \"$PROJECT_DIR\"
-            else
-              echo 'Project directory found. Pulling latest changes...'
-              cd \"$PROJECT_DIR\"
-              git pull origin main
-            fi
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} 'bash -s' << 'EOF'
+          set -euo pipefail
 
-            # Hentikan dan hapus kontainer yang berjalan
-            docker-compose down
-            
-            # Buat file .env secara dinamis dari GitHub Secrets
-            echo 'APP_ENV=production' > .env
-            echo 'APP_KEY=${{ secrets.APP_KEY }}' >> .env
-            echo 'DB_CONNECTION=${{ secrets.DB_CONNECTION }}' >> .env
-            echo 'DB_HOST=${{ secrets.DB_HOST }}' >> .env
-            echo 'DB_DATABASE=${{ secrets.DB_DATABASE }}' >> .env
-            echo 'DB_USERNAME=${{ secrets.DB_USERNAME }}' >> .env
-            echo 'DB_PASSWORD=${{ secrets.DB_PASSWORD }}' >> .env
-            # Tambahkan variabel ENV lain yang Anda butuhkan
-            
-            # Rebuild dan jalankan kontainer
-            docker-compose build --no-cache &&
-            docker-compose up -d
-          "
+          PROJECT_DIR=/var/www/html/TicketingTransportation
+          REPO_URL=https://github.com/Ganesyk12/TicketingTransportation.git
+
+          # pastikan network eksternal ada
+          docker network ls --format '{{.Name}}' | grep -qx 'tunnel' || docker network create tunnel
+
+          # clone / pull
+          if [ ! -d "$PROJECT_DIR" ] || [ ! -d "$PROJECT_DIR/.git" ]; then
+            echo 'Project directory not found or not a Git repo. Cloning repository...'
+            mkdir -p "$PROJECT_DIR"
+            git clone "$REPO_URL" "$PROJECT_DIR"
+          else
+            echo 'Project directory found. Pulling latest changes...'
+            cd "$PROJECT_DIR"
+            git fetch origin
+            git checkout main
+            git pull --rebase origin main
+          fi
+
+          cd "$PROJECT_DIR"
+
+          # tulis .env dari secrets
+          cat > .env << ENVEOF
+          APP_ENV=production
+          APP_KEY=${{ secrets.APP_KEY }}
+          DB_CONNECTION=${{ secrets.DB_CONNECTION }}
+          DB_HOST=${{ secrets.DB_HOST }}
+          DB_DATABASE=${{ secrets.DB_DATABASE }}
+          DB_USERNAME=${{ secrets.DB_USERNAME }}
+          DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+          ENVEOF
+
+          # pilih docker compose
+          if command -v docker compose >/dev/null 2>&1; then
+            DCMD="docker compose"
+          elif command -v docker-compose >/dev/null 2>&1; then
+            DCMD="docker-compose"
+          else
+            echo "docker compose not found"
+            exit 1
+          fi
+
+          # turun, build, naik
+          $DCMD down || true
+          $DCMD build --no-cache
+          $DCMD up -d
+
+          # composer & artisan di container (karena bind-mount)
+          $DCMD exec -T app composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+          $DCMD exec -T app php artisan config:cache
+          $DCMD exec -T app php artisan route:cache || true
+          $DCMD exec -T app php artisan view:cache || true
+          $DCMD exec -T app php artisan storage:link || true
+          $DCMD exec -T app php artisan migrate --force || true
+
+          # permission (jaga-jaga)
+          $DCMD exec -T app chown -R www-data:www-data storage bootstrap/cache
+          $DCMD exec -T app chmod -R 775 storage bootstrap/cache
+          EOF
