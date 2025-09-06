@@ -70,8 +70,8 @@ jobs:
             DCMD="docker-compose"
           else
             echo "ERROR: Docker Compose not found. Install one of:
-        - docker compose plugin: sudo apt-get install -y docker-compose-plugin
-        - or v1: sudo apt-get install -y docker-compose"
+          - docker compose plugin: sudo apt-get install -y docker-compose-plugin
+          - or v1: sudo apt-get install -y docker-compose"
             exit 1
           fi
           echo "Using: \$DCMD"
