@@ -27,13 +27,23 @@ jobs:
       - name: Deploy to VPS
         run: |
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "
-            cd /var/www/laravelTicketing &&
+            PROJECT_DIR=/var/www/TicketingTransportation
+            REPO_URL=https://github.com/Ganesyk12/TicketingTransportation.git
             
-            # Tarik kode terbaru
-            git pull origin main &&
+            if [ ! -d \"$PROJECT_DIR\" ] || [ ! -d \"$PROJECT_DIR/.git\" ]; then
+              echo 'Project directory not found or not a Git repo. Cloning repository...'
+              # Pastikan direktori induk ada
+              mkdir -p \"$PROJECT_DIR\"
+              git clone \"$REPO_URL\" \"$PROJECT_DIR\"
+              cd \"$PROJECT_DIR\"
+            else
+              echo 'Project directory found. Pulling latest changes...'
+              cd \"$PROJECT_DIR\"
+              git pull origin main
+            fi
 
             # Hentikan dan hapus kontainer yang berjalan
-            docker-compose down &&
+            docker-compose down
             
             # Buat file .env secara dinamis dari GitHub Secrets
             echo 'APP_ENV=production' > .env
