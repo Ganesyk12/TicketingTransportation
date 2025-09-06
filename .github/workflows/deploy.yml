@@ -29,17 +29,13 @@ jobs:
           PROJECT_DIR="$HOME/apps/TicketingTransportation"
           REPO_URL="https://github.com/Ganesyk12/TicketingTransportation.git"
 
-          # Siapkan direktori kerja dan perbaiki ownership (kadang ketimpa root dari container)
           mkdir -p "$PROJECT_DIR"
           uid=$(id -u); gid=$(id -g)
           docker run --rm -v "$PROJECT_DIR":/work alpine sh -c "chown -R $uid:$gid /work" || true
 
-          # Clone / sync
           if [ ! -d "$PROJECT_DIR/.git" ]; then
-            echo 'Cloning repository...'
             git clone "$REPO_URL" "$PROJECT_DIR"
           else
-            echo 'Pulling latest changes...'
             cd "$PROJECT_DIR"
             git fetch origin
             git checkout main || true
@@ -48,7 +44,6 @@ jobs:
 
           cd "$PROJECT_DIR"
 
-          # Tuliskan .env
           cat > .env << ENVEOF
           APP_ENV=production
           APP_KEY=${{ secrets.APP_KEY }}
@@ -59,35 +54,33 @@ jobs:
           DB_PASSWORD=${{ secrets.DB_PASSWORD }}
           ENVEOF
 
-          # Pastikan network eksternal ada
           docker network ls --format '{{.Name}}' | grep -qx 'tunnel' || docker network create tunnel
 
-          # Pilih Docker Compose (v2 atau v1) — FIX: deteksi v2 pakai subcommand
+          # pilih docker compose
           DCMD=""
           if docker compose version >/dev/null 2>&1; then
             DCMD="docker compose"
           elif command -v docker-compose >/dev/null 2>&1; then
             DCMD="docker-compose"
           else
-            echo "ERROR: Docker Compose not found. Install one of:
-          - docker compose plugin: sudo apt-get install -y docker-compose-plugin
-          - or v1: sudo apt-get install -y docker-compose"
-            exit 1
+            echo "Docker Compose not found"; exit 1
           fi
-          echo "Using: \$DCMD"
+          echo "Using: $DCMD"
+          $DCMD version || true
 
-          # Rebuild & up
-          \$DCMD down || true
-          \$DCMD build --no-cache
-          \$DCMD up -d
+          # rebuild & up
+          $DCMD down || true
+          $DCMD build --no-cache
+          $DCMD up -d
 
-          # Composer & Artisan (karena bind-mount)
-          \$DCMD exec -T app composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
-          \$DCMD exec -T app php artisan config:cache
-          \$DCMD exec -T app php artisan migrate --force || true
-          \$DCMD exec -T app chown -R www-data:www-data storage bootstrap/cache
-          \$DCMD exec -T app chmod -R 775 storage bootstrap/cache
+          # composer & artisan
+          $DCMD exec -T app composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
+          $DCMD exec -T app php artisan config:cache
+          $DCMD exec -T app php artisan migrate --force || true
+          $DCMD exec -T app chown -R www-data:www-data storage bootstrap/cache
+          $DCMD exec -T app chmod -R 775 storage bootstrap/cache
           EOF
+
 
 
 
