@@ -26,8 +26,8 @@ jobs:
           ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} 'bash -s' << 'EOF'
           set -euo pipefail
 
-          PROJECT_DIR=/var/www/html/TicketingTransportation
-          REPO_URL=https://github.com/Ganesyk12/TicketingTransportation.git
+          PROJECT_DIR="$HOME/apps/TicketingTransportation"
+          REPO_URL="https://github.com/Ganesyk12/TicketingTransportation.git"
 
           # pastikan network eksternal ada
           docker network ls --format '{{.Name}}' | grep -qx 'tunnel' || docker network create tunnel
